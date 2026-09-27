@@ -1,4 +1,5 @@
 <?php
+require("../config/auth_check_staff.php");
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
 $conn = mysqli_connect("localhost", "root", "", "student");
