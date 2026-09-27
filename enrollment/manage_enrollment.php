@@ -12,12 +12,17 @@ if (isset($_GET['delete'])) {
     $enrollment_id = (int)$_GET['delete'];
 
     try {
-        mysqli_query($conn, "DELETE FROM enrollment WHERE enrollment_id=$enrollment_id");
-        // Relative redirect
+        $stmt = mysqli_prepare($conn, "DELETE FROM enrollment WHERE enrollment_id=?");
+        mysqli_stmt_bind_param($stmt, "i", $enrollment_id);
+        mysqli_stmt_execute($stmt);
         header("Location: manage_enrollment.php");
         exit();
     } catch (mysqli_sql_exception $e) {
-        echo "<p style='color:red;'>Delete Error: " . $e->getMessage() . "</p>";
+        if ($e->getCode() == 1451) {
+            echo "<p style='color:red;'>Cannot delete this enrollment. It is referenced in another table.</p>";
+        } else {
+            echo "<p style='color:red;'>Delete Error: " . $e->getMessage() . "</p>";
+        }
     }
 }
 
@@ -29,9 +34,10 @@ if (isset($_POST['add'])) {
     $attendance_percentage = (float)$_POST['attendance_percentage'];
 
     try {
-        $insert = "INSERT INTO enrollment (enrollment_id, student_id, course_id, attendance_percentage)
-                   VALUES ($enrollment_id, $student_id, $course_id, $attendance_percentage)";
-        mysqli_query($conn, $insert);
+        $stmt = mysqli_prepare($conn,
+            "INSERT INTO enrollment (enrollment_id, student_id, course_id, attendance_percentage) VALUES (?, ?, ?, ?)");
+        mysqli_stmt_bind_param($stmt, "iiid", $enrollment_id, $student_id, $course_id, $attendance_percentage);
+        mysqli_stmt_execute($stmt);
         header("Location: manage_enrollment.php");
         exit();
     } catch (mysqli_sql_exception $e) {
@@ -53,10 +59,10 @@ if (isset($_POST['update'])) {
     $attendance_percentage = (float)$_POST['attendance_percentage'];
 
     try {
-        $update = "UPDATE enrollment
-                   SET student_id=$student_id, course_id=$course_id, attendance_percentage=$attendance_percentage
-                   WHERE enrollment_id=$enrollment_id";
-        mysqli_query($conn, $update);
+        $stmt = mysqli_prepare($conn,
+            "UPDATE enrollment SET student_id=?, course_id=?, attendance_percentage=? WHERE enrollment_id=?");
+        mysqli_stmt_bind_param($stmt, "iidi", $student_id, $course_id, $attendance_percentage, $enrollment_id);
+        mysqli_stmt_execute($stmt);
         header("Location: manage_enrollment.php");
         exit();
     } catch (mysqli_sql_exception $e) {
@@ -72,7 +78,10 @@ if (isset($_POST['update'])) {
 $editData = null;
 if (isset($_GET['edit'])) {
     $enrollment_id = (int)$_GET['edit'];
-    $result = mysqli_query($conn, "SELECT * FROM enrollment WHERE enrollment_id=$enrollment_id");
+    $stmt = mysqli_prepare($conn, "SELECT * FROM enrollment WHERE enrollment_id=?");
+    mysqli_stmt_bind_param($stmt, "i", $enrollment_id);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
     $editData = mysqli_fetch_assoc($result);
 }
 ?>
@@ -85,7 +94,6 @@ if (isset($_GET['edit'])) {
 </head>
 <body>
 
-<!-- Dashboard link -->
 <div style="margin-bottom:15px;">
     <a href="../dashboard/dashboard.php">⬅ Back to Dashboard</a>
 </div>
@@ -121,7 +129,7 @@ if (isset($_GET['edit'])) {
 
     <?php if ($editData) { ?>
         <button type="submit" name="update">Update Enrollment</button>
-        <a href="enrollment_manage.php">Cancel</a>
+        <a href="manage_enrollment.php">Cancel</a>
     <?php } else { ?>
         <button type="submit" name="add">Add Enrollment</button>
     <?php } ?>
@@ -152,9 +160,8 @@ while ($row = mysqli_fetch_assoc($result)) {
     <td><?php echo $row['course_id']; ?></td>
     <td><?php echo $row['attendance_percentage']; ?></td>
     <td>
-        <!-- RELATIVE LINKS: No leading slashes -->
         <a href="manage_enrollment.php?edit=<?php echo $row['enrollment_id']; ?>">Edit</a> |
-        <a href="manage_enrollment.php?delete=<?php echo $row['enrollment_id']; ?>" 
+        <a href="manage_enrollment.php?delete=<?php echo $row['enrollment_id']; ?>"
            onclick="return confirm('Are you sure?')">Delete</a>
     </td>
 </tr>

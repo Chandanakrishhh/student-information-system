@@ -15,25 +15,13 @@ if (isset($_GET['delete'])) {
     $exam_id = (int)$_GET['delete'];
 
     try {
-
-        // Check if record exists
-        $check = mysqli_query($conn,
-            "SELECT * FROM exam WHERE exam_id=$exam_id");
-
-        if (mysqli_num_rows($check) == 0) {
-            $error = "Exam record not found.";
-        } else {
-
-            mysqli_query($conn,
-                "DELETE FROM exam WHERE exam_id=$exam_id");
-
-            header("Location: exam_manage.php");
-            exit();
-        }
+        $stmt = mysqli_prepare($conn, "DELETE FROM exam WHERE exam_id=?");
+        mysqli_stmt_bind_param($stmt, "i", $exam_id);
+        mysqli_stmt_execute($stmt);
+        header("Location: exam_manage.php");
+        exit();
 
     } catch (mysqli_sql_exception $e) {
-
-        // Foreign key constraint
         if ($e->getCode() == 1451) {
             $error = "Cannot delete this exam. It is referenced in another table.";
         } else {
@@ -42,26 +30,23 @@ if (isset($_GET['delete'])) {
     }
 }
 
-
 /* ------------------ ADD ------------------ */
 if (isset($_POST['add'])) {
 
     $exam_id   = (int)$_POST['exam_id'];
-    $exam_type = mysqli_real_escape_string($conn, $_POST['exam_type']);
+    $exam_type = $_POST['exam_type'];
     $exam_date = $_POST['exam_date'];
     $course_id = (int)$_POST['course_id'];
 
     try {
-
-        mysqli_query($conn,
-            "INSERT INTO exam (exam_id, exam_type, exam_date, course_id)
-             VALUES ($exam_id, '$exam_type', '$exam_date', $course_id)");
-
+        $stmt = mysqli_prepare($conn,
+            "INSERT INTO exam (exam_id, exam_type, exam_date, course_id) VALUES (?, ?, ?, ?)");
+        mysqli_stmt_bind_param($stmt, "issi", $exam_id, $exam_type, $exam_date, $course_id);
+        mysqli_stmt_execute($stmt);
         header("Location: exam_manage.php");
         exit();
 
     } catch (mysqli_sql_exception $e) {
-
         if ($e->getCode() == 1062) {
             $error = "Exam ID already exists (Primary Key violation).";
         } elseif ($e->getCode() == 1452) {
@@ -72,29 +57,23 @@ if (isset($_POST['add'])) {
     }
 }
 
-
 /* ------------------ UPDATE ------------------ */
 if (isset($_POST['update'])) {
 
     $exam_id   = (int)$_POST['exam_id'];
-    $exam_type = mysqli_real_escape_string($conn, $_POST['exam_type']);
+    $exam_type = $_POST['exam_type'];
     $exam_date = $_POST['exam_date'];
     $course_id = (int)$_POST['course_id'];
 
     try {
-
-        mysqli_query($conn,
-            "UPDATE exam SET
-                exam_type='$exam_type',
-                exam_date='$exam_date',
-                course_id=$course_id
-             WHERE exam_id=$exam_id");
-
+        $stmt = mysqli_prepare($conn,
+            "UPDATE exam SET exam_type=?, exam_date=?, course_id=? WHERE exam_id=?");
+        mysqli_stmt_bind_param($stmt, "ssii", $exam_type, $exam_date, $course_id, $exam_id);
+        mysqli_stmt_execute($stmt);
         header("Location: exam_manage.php");
         exit();
 
     } catch (mysqli_sql_exception $e) {
-
         if ($e->getCode() == 1452) {
             $error = "Invalid Course ID!";
         } else {
@@ -103,16 +82,16 @@ if (isset($_POST['update'])) {
     }
 }
 
-
 /* ------------------ EDIT FETCH ------------------ */
 $editData = null;
 
 if (isset($_GET['edit'])) {
-
     $exam_id = (int)$_GET['edit'];
 
-    $result = mysqli_query($conn,
-        "SELECT * FROM exam WHERE exam_id=$exam_id");
+    $stmt = mysqli_prepare($conn, "SELECT * FROM exam WHERE exam_id=?");
+    mysqli_stmt_bind_param($stmt, "i", $exam_id);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
 
     if (mysqli_num_rows($result) > 0) {
         $editData = mysqli_fetch_assoc($result);
@@ -148,7 +127,7 @@ if (isset($_GET['edit'])) {
 
     <label>Exam Type:</label>
     <input type="text" name="exam_type"
-           value="<?= $editData['exam_type'] ?? '' ?>" required>
+           value="<?= htmlspecialchars($editData['exam_type'] ?? '') ?>" required>
 
     <label>Exam Date:</label>
     <input type="date" name="exam_date"
@@ -189,7 +168,7 @@ while ($row = mysqli_fetch_assoc($result)) {
 ?>
 <tr>
     <td><?= $row['exam_id']; ?></td>
-    <td><?= $row['exam_type']; ?></td>
+    <td><?= htmlspecialchars($row['exam_type']); ?></td>
     <td><?= $row['exam_date']; ?></td>
     <td><?= $row['course_id']; ?></td>
     <td>

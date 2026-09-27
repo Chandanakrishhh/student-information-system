@@ -12,7 +12,9 @@ if (isset($_GET['delete'])) {
     $course_id = (int)$_GET['delete'];
 
     try {
-        mysqli_query($conn, "DELETE FROM course WHERE course_id=$course_id");
+        $stmt = mysqli_prepare($conn, "DELETE FROM course WHERE course_id=?");
+        mysqli_stmt_bind_param($stmt, "i", $course_id);
+        mysqli_stmt_execute($stmt);
         header("Location: course_manage.php");
         exit();
     } catch (mysqli_sql_exception $e) {
@@ -23,14 +25,15 @@ if (isset($_GET['delete'])) {
 /* ------------------ ADD ------------------ */
 if (isset($_POST['add'])) {
     $course_id   = (int)$_POST['course_id'];
-    $course_name = mysqli_real_escape_string($conn, $_POST['course_name']);
+    $course_name = $_POST['course_name'];
     $credits     = (int)$_POST['credits'];
     $faculty_id  = (int)$_POST['faculty_id'];
 
     try {
-        $insert = "INSERT INTO course (course_id, course_name, credits, faculty_id)
-                   VALUES ($course_id, '$course_name', $credits, $faculty_id)";
-        mysqli_query($conn, $insert);
+        $stmt = mysqli_prepare($conn,
+            "INSERT INTO course (course_id, course_name, credits, faculty_id) VALUES (?, ?, ?, ?)");
+        mysqli_stmt_bind_param($stmt, "isii", $course_id, $course_name, $credits, $faculty_id);
+        mysqli_stmt_execute($stmt);
         header("Location: course_manage.php");
         exit();
     } catch (mysqli_sql_exception $e) {
@@ -47,15 +50,15 @@ if (isset($_POST['add'])) {
 /* ------------------ UPDATE ------------------ */
 if (isset($_POST['update'])) {
     $course_id   = (int)$_POST['course_id'];
-    $course_name = mysqli_real_escape_string($conn, $_POST['course_name']);
+    $course_name = $_POST['course_name'];
     $credits     = (int)$_POST['credits'];
     $faculty_id  = (int)$_POST['faculty_id'];
 
     try {
-        $update = "UPDATE course
-                   SET course_name='$course_name', credits=$credits, faculty_id=$faculty_id
-                   WHERE course_id=$course_id";
-        mysqli_query($conn, $update);
+        $stmt = mysqli_prepare($conn,
+            "UPDATE course SET course_name=?, credits=?, faculty_id=? WHERE course_id=?");
+        mysqli_stmt_bind_param($stmt, "siii", $course_name, $credits, $faculty_id, $course_id);
+        mysqli_stmt_execute($stmt);
         header("Location: course_manage.php");
         exit();
     } catch (mysqli_sql_exception $e) {
@@ -71,7 +74,10 @@ if (isset($_POST['update'])) {
 $editData = null;
 if (isset($_GET['edit'])) {
     $course_id = (int)$_GET['edit'];
-    $result = mysqli_query($conn, "SELECT * FROM course WHERE course_id=$course_id");
+    $stmt = mysqli_prepare($conn, "SELECT * FROM course WHERE course_id=?");
+    mysqli_stmt_bind_param($stmt, "i", $course_id);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
     $editData = mysqli_fetch_assoc($result);
 }
 ?>
@@ -104,7 +110,7 @@ if (isset($_GET['edit'])) {
 
     <label>Course Name:</label>
     <input type="text" name="course_name" required
-           value="<?php echo $editData['course_name'] ?? ''; ?>">
+           value="<?php echo htmlspecialchars($editData['course_name'] ?? ''); ?>">
     <br><br>
 
     <label>Credits:</label>
@@ -146,7 +152,7 @@ while ($row = mysqli_fetch_assoc($result)) {
 ?>
 <tr>
     <td><?php echo $row['course_id']; ?></td>
-    <td><?php echo $row['course_name']; ?></td>
+    <td><?php echo htmlspecialchars($row['course_name']); ?></td>
     <td><?php echo $row['credits']; ?></td>
     <td><?php echo $row['faculty_id']; ?></td>
     <td>

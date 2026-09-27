@@ -1,4 +1,6 @@
 <?php
+mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+
 include("../config/db_connect.php");
 
 $message = "";
@@ -7,34 +9,27 @@ $message = "";
 if (isset($_POST['add'])) {
 
     $student_id = (int)$_POST['student_id'];
-    $name  = mysqli_real_escape_string($conn, $_POST['name']);
-    $dob   = mysqli_real_escape_string($conn, $_POST['dob']);
-    $email = mysqli_real_escape_string($conn, $_POST['email']);
-    $phone = mysqli_real_escape_string($conn, $_POST['phone']);
-    $department = mysqli_real_escape_string($conn, $_POST['department']);
+    $name  = $_POST['name'];
+    $dob   = $_POST['dob'];
+    $email = $_POST['email'];
+    $phone = $_POST['phone'];
+    $department = $_POST['department'];
 
     try {
+        $stmt = mysqli_prepare($conn,
+            "INSERT INTO student_info (student_id, name, dob, email, phone, department) VALUES (?, ?, ?, ?, ?, ?)");
+        mysqli_stmt_bind_param($stmt, "isssss", $student_id, $name, $dob, $email, $phone, $department);
+        mysqli_stmt_execute($stmt);
 
-        $check = mysqli_query($conn,
-            "SELECT * FROM student_info WHERE student_id = $student_id");
-
-        if (mysqli_num_rows($check) > 0) {
-            $message = "Error: Student ID already exists (Primary Key violation).";
-        } else {
-
-            $insert = "INSERT INTO student_info 
-                       (student_id, name, dob, email, phone, department)
-                       VALUES 
-                       ($student_id, '$name', '$dob', '$email', '$phone', '$department')";
-
-            mysqli_query($conn, $insert);
-
-            header("Location: manage_student.php");
-            exit();
-        }
+        header("Location: manage_student.php");
+        exit();
 
     } catch (mysqli_sql_exception $e) {
-        $message = "Database Error: " . $e->getMessage();
+        if ($e->getCode() == 1062) {
+            $message = "Error: Student ID already exists (Primary Key violation).";
+        } else {
+            $message = "Database Error: " . $e->getMessage();
+        }
     }
 }
 
@@ -45,16 +40,14 @@ if (isset($_GET['delete'])) {
     $student_id = (int)$_GET['delete'];
 
     try {
-
-        mysqli_query($conn,
-            "DELETE FROM student_info WHERE student_id=$student_id");
+        $stmt = mysqli_prepare($conn, "DELETE FROM student_info WHERE student_id=?");
+        mysqli_stmt_bind_param($stmt, "i", $student_id);
+        mysqli_stmt_execute($stmt);
 
         header("Location: manage_student.php");
         exit();
 
     } catch (mysqli_sql_exception $e) {
-
-        // Foreign key constraint error
         if ($e->getCode() == 1451) {
             $message = "Error: Cannot delete this student. 
                         This record is referenced in another table (Foreign Key constraint).";
@@ -69,23 +62,17 @@ if (isset($_GET['delete'])) {
 if (isset($_POST['update'])) {
 
     $student_id = (int)$_POST['student_id'];
-    $name  = mysqli_real_escape_string($conn, $_POST['name']);
-    $dob   = mysqli_real_escape_string($conn, $_POST['dob']);
-    $email = mysqli_real_escape_string($conn, $_POST['email']);
-    $phone = mysqli_real_escape_string($conn, $_POST['phone']);
-    $department = mysqli_real_escape_string($conn, $_POST['department']);
+    $name  = $_POST['name'];
+    $dob   = $_POST['dob'];
+    $email = $_POST['email'];
+    $phone = $_POST['phone'];
+    $department = $_POST['department'];
 
     try {
-
-        $update = "UPDATE student_info SET
-                   name='$name',
-                   dob='$dob',
-                   email='$email',
-                   phone='$phone',
-                   department='$department'
-                   WHERE student_id=$student_id";
-
-        mysqli_query($conn, $update);
+        $stmt = mysqli_prepare($conn,
+            "UPDATE student_info SET name=?, dob=?, email=?, phone=?, department=? WHERE student_id=?");
+        mysqli_stmt_bind_param($stmt, "sssssi", $name, $dob, $email, $phone, $department, $student_id);
+        mysqli_stmt_execute($stmt);
 
         header("Location: manage_student.php");
         exit();
@@ -101,8 +88,11 @@ $editData = null;
 
 if (isset($_GET['edit'])) {
     $student_id = (int)$_GET['edit'];
-    $result = mysqli_query($conn,
-        "SELECT * FROM student_info WHERE student_id=$student_id");
+
+    $stmt = mysqli_prepare($conn, "SELECT * FROM student_info WHERE student_id=?");
+    mysqli_stmt_bind_param($stmt, "i", $student_id);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
     $editData = mysqli_fetch_assoc($result);
 }
 ?>
@@ -141,7 +131,7 @@ if (isset($_GET['edit'])) {
 
 <label>Name:</label>
 <input type="text" name="name" required
-       value="<?php echo $editData['name'] ?? ''; ?>">
+       value="<?php echo htmlspecialchars($editData['name'] ?? ''); ?>">
 
 <label>DOB:</label>
 <input type="date" name="dob" required
@@ -149,15 +139,15 @@ if (isset($_GET['edit'])) {
 
 <label>Email:</label>
 <input type="email" name="email" required
-       value="<?php echo $editData['email'] ?? ''; ?>">
+       value="<?php echo htmlspecialchars($editData['email'] ?? ''); ?>">
 
 <label>Phone:</label>
 <input type="text" name="phone" required
-       value="<?php echo $editData['phone'] ?? ''; ?>">
+       value="<?php echo htmlspecialchars($editData['phone'] ?? ''); ?>">
 
 <label>Department:</label>
 <input type="text" name="department" required
-       value="<?php echo $editData['department'] ?? ''; ?>">
+       value="<?php echo htmlspecialchars($editData['department'] ?? ''); ?>">
 
 <br>
 
@@ -195,11 +185,11 @@ while ($row = mysqli_fetch_assoc($data)) {
 ?>
 <tr>
     <td><?php echo $row['student_id']; ?></td>
-    <td><?php echo $row['name']; ?></td>
+    <td><?php echo htmlspecialchars($row['name']); ?></td>
     <td><?php echo $row['dob']; ?></td>
-    <td><?php echo $row['email']; ?></td>
-    <td><?php echo $row['phone']; ?></td>
-    <td><?php echo $row['department']; ?></td>
+    <td><?php echo htmlspecialchars($row['email']); ?></td>
+    <td><?php echo htmlspecialchars($row['phone']); ?></td>
+    <td><?php echo htmlspecialchars($row['department']); ?></td>
     <td>
         <a href="?edit=<?php echo $row['student_id']; ?>">Edit</a> |
         <a href="?delete=<?php echo $row['student_id']; ?>"
